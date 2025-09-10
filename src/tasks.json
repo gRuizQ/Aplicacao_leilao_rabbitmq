@@ -1,0 +1,88 @@
+{
+	"version": "2.0.0",
+	"tasks": [
+		{
+			"label": "Run All Microservices",
+			"dependsOn": [
+				"Run MS_leilao",
+				"Run MS_lance",
+				"Run MS_notificacao",
+				"Run cliente_01",
+				"Run cliente_02"
+			],
+			"group": {
+				"kind": "build",
+				"isDefault": true
+			},
+			"presentation": {
+				"panel": "new",
+				"reveal": "always"
+			},
+			"runOptions": {
+				"runOn": "default"
+			}
+		},
+		{
+			"label": "Run MS_leilao",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"MS_leilao.py"
+			],
+			"isBackground": true,
+			"presentation": {
+				"group": "leilao_group"
+			}
+		},
+		{
+			"label": "Run MS_lance",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"MS_lance.py"
+			],
+			"isBackground": true,
+			"presentation": {
+				"group": "lance_group"
+			}
+		},
+		{
+			"label": "Run MS_notificacao",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"MS_notificacao.py"
+			],
+			"isBackground": true,
+			"presentation": {
+				"group": "notificacao_group"
+			}
+		},
+		{
+			"label": "Run cliente_01",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"cliente.py",
+				"cliente_01" 
+			],
+			"isBackground": true,
+			"presentation": {
+				"group": "cliente_group"
+			}
+		},
+		{
+			"label": "Run cliente_02",
+			"type": "shell",
+			"command": "python",
+			"args": [
+				"cliente.py",
+				"cliente_02" 
+			],
+			"isBackground": true,
+			"presentation": {
+				"group": "cliente_group"
+			}
+		}
+	]
+}

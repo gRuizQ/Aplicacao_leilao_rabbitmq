@@ -1,0 +1,79 @@
+{
+  "leiloes": [
+    {
+      "id": 1,
+      "descricao": "iPhone 15 Pro Max 256GB",
+      "valor_minimo": 5000.00
+    },
+    {
+      "id": 2,
+      "descricao": "PC Gamer RTX 4080 32GB RAM",
+      "valor_minimo": 8000.00
+    },
+    {
+      "id": 3,
+      "descricao": "MacBook Pro M3 16 polegadas",
+      "valor_minimo": 12000.00
+    },
+    {
+      "id": 4,
+      "descricao": "PlayStation 5 + 2 Controles",
+      "valor_minimo": 2500.00
+    },
+    {
+      "id": 5,
+      "descricao": "Smart TV Samsung 65 QLED 4K",
+      "valor_minimo": 4000.00
+    },
+    {
+      "id": 6,
+      "descricao": "Notebook Dell XPS 13 i7",
+      "valor_minimo": 6000.00
+    },
+    {
+      "id": 7,
+      "descricao": "iPad Pro 12.9 com Apple Pencil",
+      "valor_minimo": 4500.00
+    },
+    {
+      "id": 8,
+      "descricao": "Xbox Series X + Game Pass",
+      "valor_minimo": 2200.00
+    },
+    {
+      "id": 9,
+      "descricao": "AirPods Pro 2ª Geração",
+      "valor_minimo": 1200.00
+    },
+    {
+      "id": 10,
+      "descricao": "Monitor Gamer 27 144Hz Curvo",
+      "valor_minimo": 1800.00
+    },
+    {
+      "id": 11,
+      "descricao": "Drone DJI Mini 3 Pro",
+      "valor_minimo": 3500.00
+    },
+    {
+      "id": 12,
+      "descricao": "Câmera Canon EOS R6 Mark II",
+      "valor_minimo": 15000.00
+    },
+    {
+      "id": 13,
+      "descricao": "Teclado Mecânico Gamer RGB",
+      "valor_minimo": 500.00
+    },
+    {
+      "id": 14,
+      "descricao": "Headset Gamer Wireless 7.1",
+      "valor_minimo": 800.00
+    },
+    {
+      "id": 15,
+      "descricao": "Smartwatch Apple Watch Ultra",
+      "valor_minimo": 4000.00
+    }
+  ]
+}
