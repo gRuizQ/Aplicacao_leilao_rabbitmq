@@ -1,4 +1,11 @@
 # Sistema de Leilões Distribuído
+Sistema de leilões em tempo real usando RabbitMQ e criptografia RSA.
+
+## Funcionalidades
+- Leilões em tempo real
+- Autenticação com assinatura digital RSA
+- Interface gráfica para clientes
+- Microserviços distribuídos
 
 ## Como Executar o Sistema
 
