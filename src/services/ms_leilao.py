@@ -6,21 +6,21 @@ import sys
 import os
 import random
 
-# Adicionar o diretório pai ao path para importar o logger
+#importa o logger
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from logger import create_logger
 
 # Criar logger para este microserviço
 logger = create_logger('ms_leilao')
 
+# Configurar conexão com RabbitMQ
 connection = pika.BlockingConnection(
     pika.ConnectionParameters(host='localhost'))
 channel = connection.channel()
 
-# Carregar dicionário de leilões
 def carregar_leiloes_dicionario():
     try:
-        # Caminho absoluto baseado na localização do script
+        # Caminho baseado na localização do script
         script_dir = os.path.dirname(os.path.abspath(__file__))
         arquivo_path = os.path.join(script_dir, '..', 'dictionary', 'leiloes_data.json')
         with open(arquivo_path, 'r', encoding='utf-8') as f:
@@ -33,7 +33,6 @@ def carregar_leiloes_dicionario():
         logger.error(f"Erro ao carregar dicionário de leilões: {e}")
         return []
 
-# Gerar leilões com descrições aleatórias
 def gerar_leiloes():
     leiloes_dict = carregar_leiloes_dicionario()
     
@@ -42,6 +41,7 @@ def gerar_leiloes():
     
     leiloes = []
     for i, leilao_data in enumerate(leiloes_selecionados, 1):
+        # Define os dados do leilão
         leiloes.append({
             "id": f"leilao_{i:02d}",
             "descricao": leilao_data['descricao'],
@@ -57,7 +57,7 @@ leiloes = gerar_leiloes()
 
 #*****************************************************************************#
 
-
+# Configurar fila leilao_iniciado e leilao_finalizado e exchange fsnout
 channel.queue_declare(queue='leilao_iniciado')
 channel.exchange_declare(exchange='leiloes', exchange_type='fanout')
 channel.queue_declare(queue='leilao_finalizado')
@@ -72,6 +72,7 @@ while True:
         horario_atual = datetime.datetime.now()
 
         if leilao['status'] == 'pendente' and horario_atual >= leilao['data_inicio'] and not horario_atual >= leilao['data_fim']:
+            # Para leilões pendentes tornarem ativos
             leilao['status'] = 'ativo'
             logger.log_leilao_iniciado(leilao['id'], leilao['descricao'], leilao['data_inicio'], leilao['data_fim'])
             
@@ -85,9 +86,13 @@ while True:
 
             body = json.dumps(mensagem).encode('utf-8')
 
+            # Publicar mensagem na fila leilao_iniciado
+            channel.basic_publish(exchange='', routing_key='leilao_iniciado', body=body)
+            # Publicar mensagem via exchange leiloes
             channel.basic_publish(exchange='leiloes', routing_key='', body=body)
 
         elif leilao['status'] == 'ativo' and horario_atual >= leilao['data_fim']: 
+            # Para leilões ativos tornarem encerrados
             leilao['status'] = 'encerrado'
             logger.info(f"LEILÃO FINALIZADO - ID: {leilao['id']}")
 
@@ -97,6 +102,7 @@ while True:
             
             body = json.dumps(mensagem).encode('utf-8')
             
+            # Publicar mensagem na fila leilao_finalizado
             channel.basic_publish(exchange='', routing_key='leilao_finalizado', body=body)
 
     time.sleep(1)

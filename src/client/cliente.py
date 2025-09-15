@@ -10,16 +10,17 @@ from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 from client_window import ClienteGUI
 
-# Adicionar o diretório pai ao path para importar o logger
+# importa o logger
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from logger import create_logger
 
+#conecta com o servidor rabbitmq
 connection = pika.BlockingConnection(
     pika.ConnectionParameters(host='localhost')
 )
 channel = connection.channel()
 
-
+#define o id do cliente
 if len(sys.argv) > 1:
     CLIENTE_ID = sys.argv[1]
 else:
@@ -27,11 +28,14 @@ else:
     print("Uso: python cliente.py <id_do_cliente>")
     sys.exit(1)
 
-# Criar logger para este cliente
+# Criar logger e lista de leiloes para este cliente
 logger = create_logger(f'cliente_{CLIENTE_ID}')
 leiloes_interessados = set()
 leiloes_conhecidos = {}
 
+# Cria o diretório keys se não existir
+os.makedirs("../keys", exist_ok=True)
+#gera as chaves publica e privada
 key = RSA.generate(2048)
 private_key = key.export_key()
 with open(f"../keys/private_{CLIENTE_ID}.pem", "wb") as f:
@@ -42,14 +46,17 @@ with open(f"../keys/public_{CLIENTE_ID}.pem", "wb") as f:
     f.write(public_key)
 
 #*****************************************************************************#
+
+#configura o canal para receber informações dos leiloes
 channel.exchange_declare(exchange='leiloes', exchange_type='fanout')
-result = channel.queue_declare(queue='', exclusive=True)
+result = channel.queue_declare(queue='', exclusive=True) #fila temporária do cliente
 queue_name = result.method.queue
 channel.queue_bind(exchange='leiloes', queue=queue_name)
 
 # Variável global para a GUI
 gui = None
 
+#comando de execução após receber a mensagem do ms_leilao
 def callback_inicio_leilao(ch, method, properties, body):
     global gui
     msg = body.decode('utf-8')
@@ -71,10 +78,12 @@ def callback_inicio_leilao(ch, method, properties, body):
         gui.cotacoes_atuais[id_leilao] = f"R$ {valor_minimo:.2f}"
         gui.novo_leilao(id_leilao, descricao, data.get('data_inicio'), data.get('data_fim'))
 
+#consome as mensagens da fila temporária
 channel.basic_consume(queue=queue_name, on_message_callback=callback_inicio_leilao, auto_ack=True)
 
 #*****************************************************************************#
 
+#gera a assinatura digital
 message = b'AplicacaoLeilao.2025.2'
 key = RSA.import_key(open(f'../keys/private_{CLIENTE_ID}.pem').read())
 h = SHA256.new(message)
@@ -85,6 +94,7 @@ signature = pkcs1_15.new(key).sign(h)
 def dar_lance(id_leilao, valor):
     global gui
     
+    #verifica se o leilao é conhecido
     if id_leilao not in leiloes_conhecidos:
         logger.error(f"Tentativa de lance em leilão inexistente: {id_leilao}")
         logger.info(f"Leilões disponíveis: {', '.join(leiloes_conhecidos.keys())}")
@@ -92,10 +102,12 @@ def dar_lance(id_leilao, valor):
             gui.log_message(f"❌ Leilão {id_leilao} não existe")
         return
     
+    #verifica se o leilao faz parte dos leiloes de interesse do cliente
     if id_leilao not in leiloes_interessados:
         leiloes_interessados.add(id_leilao)
         escutar_leilao(id_leilao)
-        
+    
+    #não aceita valores nulos ou negativos
     if valor <= 0:
         logger.error(f"Valor de lance inválido: {valor} (deve ser maior que zero)")
         if gui:
@@ -112,8 +124,10 @@ def dar_lance(id_leilao, valor):
             gui.lance_rejeitado(id_leilao, valor, "Valor insuficiente", cotacao_str)
             return
     
+    #define a assinatura digital
     assinatura_base64 = base64.b64encode(signature).decode('utf-8')
 
+    #define os dados do lance
     dados_do_lance = {
         "id_usuario": CLIENTE_ID,
         "id_leilao": id_leilao,
@@ -122,11 +136,13 @@ def dar_lance(id_leilao, valor):
     }
     
     try:
+        #conecta ao broker
         connection_envio = pika.BlockingConnection(
             pika.ConnectionParameters(host='localhost')
         )
         canal_envio = connection_envio.channel()
 
+        #declara a fila de lance_realizado
         canal_envio.queue_declare(queue='lance_realizado')
         mensagem_json = json.dumps(dados_do_lance)
         canal_envio.basic_publish(exchange='',routing_key='lance_realizado',body=mensagem_json.encode('utf-8')        )
@@ -143,9 +159,12 @@ def dar_lance(id_leilao, valor):
             gui.log_message(f"❌ Erro ao enviar lance: {e}")
 
 #*****************************************************************************#
+
+#configura o canal para receber as mensagens de um leilão de interesse do cliente
 channel.exchange_declare(exchange='leilao', exchange_type='topic')
 
 def escutar_leilao(id_leilao):
+    #função para notificar as mensagens de um leilão de interesse para o cliente
     def callback_notificacao(ch, method, properties, body):
         global gui
         msg = body.decode('utf-8')
@@ -153,13 +172,15 @@ def escutar_leilao(id_leilao):
 
         routing_key = method.routing_key
         
+        #verifica se a mensagem é um lance
         if routing_key.endswith('.lance'):
             logger.log_lance_recebido(id_leilao, data.get('id_usuario'), data.get('valor_do_lance'))
             
             # Notificar GUI se estiver disponível
             if gui:
                 gui.lance_recebido(id_leilao, data.get('id_usuario'), data.get('valor_do_lance'))
-            
+        
+        #verifica se a mensagem é um fim de leilão
         if routing_key.endswith('.fim'):
             vencedor = data.get('id_vencedor')
             valor_final = data.get('valor_negociado')
@@ -175,19 +196,24 @@ def escutar_leilao(id_leilao):
                 else:
                     gui.log_message(f"🏁 Leilão {id_leilao} finalizado. Vencedor: {data.get('id_vencedor')} - R$ {data.get('valor_negociado'):.2f}")
 
+    #função para escutar as mensagens de um leilão de interesse do cliente
     def thread_listener():
         try:
+            #cria uma conexão com o broker
             conn_local = pika.BlockingConnection(
                 pika.ConnectionParameters('localhost')
             )
             ch_local = conn_local.channel()
 
+            #cria uma fila temporária
             result = ch_local.queue_declare(queue='', exclusive=True)
             qname = result.method.queue
             
+            #associa a fila à exchange com as routing keys do leilão
             ch_local.queue_bind(exchange='leilao', queue=qname, routing_key=f"{id_leilao}.lance")
             ch_local.queue_bind(exchange='leilao', queue=qname, routing_key=f"{id_leilao}.fim")
             
+            #inicia a consumação de mensagens
             ch_local.basic_consume(queue=qname, on_message_callback=callback_notificacao, auto_ack=True)
             logger.log_cliente_acao("ESCUTANDO_LEILAO", f"Monitorando eventos do leilão {id_leilao}")
             
@@ -195,10 +221,12 @@ def escutar_leilao(id_leilao):
         except Exception as e:
             logger.error(f"Erro ao escutar leilão {id_leilao}: {e}")
 
+    #inicia a thread para escutar as mensagens
     t = threading.Thread(target=thread_listener, daemon=True)
     t.start()
 
 #*****************************************************************************#
+
 def iniciar_gui():
     """Inicia a interface gráfica"""
     global gui

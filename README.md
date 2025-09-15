@@ -73,11 +73,6 @@ Quando o cliente iniciar, uma janela gráfica será aberta com as seguintes func
 - Todos os lances são assinados digitalmente
 - O sistema valida as assinaturas antes de aceitar lances
 
-## Leilões Configurados
-
-- **leilao_01**: iPhone (duração: ~30 segundos)
-- **leilao_02**: PC Gamer (duração: ~5 minutos)
-
 ## Exemplo de Uso
 
 1. Inicie todos os microserviços

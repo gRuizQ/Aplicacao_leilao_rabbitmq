@@ -7,13 +7,14 @@ from Crypto.Signature import pkcs1_15
 from Crypto.Hash import SHA256
 from Crypto.PublicKey import RSA
 
-# Adicionar o diretório pai ao path para importar o logger
+# importa o logger
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 from logger import create_logger
 
 # Criar logger para este microserviço
 logger = create_logger('ms_lance')
 
+# Configurar conexão com RabbitMQ
 connection = pika.BlockingConnection(
     pika.ConnectionParameters(host='localhost'))
 channel = connection.channel()
@@ -23,13 +24,13 @@ ultimos_lances = {}
 
 #*****************************************************************************#
 
-# Declarar filas
+# Declarar filas 
 channel.queue_declare(queue='lance_realizado')
 channel.queue_declare(queue='lance_validado')
 channel.queue_declare(queue='leilao_finalizado')
 channel.queue_declare(queue='leilao_vencedor')
 
-
+# Verifica o lance e publica na fila lance_validado
 def callback_lance(ch, method, properties, body):
     msg = body.decode('utf-8')
     data = json.loads(msg)
@@ -43,6 +44,7 @@ def callback_lance(ch, method, properties, body):
         return
 
     try:
+        # Verifica assinatura com a chave pública do usuário
         with open(f'../keys/public_{id_usuario}.pem', 'rb') as f:
             key = RSA.import_key(f.read())
 
@@ -68,8 +70,8 @@ def callback_lance(ch, method, properties, body):
         logger.error(f"Erro inesperado ao processar lance: {e}")
         return
 
+    # Verifica se o lance é maior que o último lance
     ultimo_lance_valor = (ultimos_lances.get(id_leilao, {})).get('valor_do_lance', 0)
-
     if valor_do_lance <= ultimo_lance_valor:
         logger.info(f"Valor Insuficiente... Cotação atual do leilão: R${ultimo_lance_valor:.2f}")
         logger.log_lance_rejeitado(id_leilao, id_usuario, valor_do_lance, "Valor insuficiente")
@@ -81,6 +83,7 @@ def callback_lance(ch, method, properties, body):
     }
 
     logger.log_lance_validado(id_leilao, id_usuario, valor_do_lance)
+
     mensagem = {
         "id_leilao": id_leilao,
         "id_usuario": id_usuario,
@@ -89,16 +92,18 @@ def callback_lance(ch, method, properties, body):
 
     body_e = json.dumps(mensagem).encode('utf-8')
 
+    # Publica na fila lance_validado após o lance ser validado
     channel.basic_publish(exchange='', routing_key='lance_validado', body=body_e)
 
-    
-channel.basic_consume(queue='lance_realizado', on_message_callback=callback_lance, auto_ack=True)
 
+# Consumir mensagens da fila lance_realizado
+channel.basic_consume(queue='lance_realizado', on_message_callback=callback_lance, auto_ack=True)
 
 #*****************************************************************************#
 
+# Declara exchange leiloes
 channel.exchange_declare(exchange='leiloes', exchange_type='fanout')
-result = channel.queue_declare(queue='', exclusive=True)
+result = channel.queue_declare(queue='', exclusive=True) # Declara uma fila temporária
 queue_name = result.method.queue
 channel.queue_bind(exchange='leiloes', queue=queue_name)
 
@@ -106,10 +111,12 @@ def callback_inicio_leilao(ch, method, properties, body):
     logger.info(f"Novo leilão detectado: {body.decode()}")
 
 
+# Consumir mensagens da fila temporária provida pela exchange 'leiloes'
 channel.basic_consume(queue=queue_name, on_message_callback=callback_inicio_leilao, auto_ack=True)
 
 #*****************************************************************************#
 
+# Declaração de filas leilao_finalizado e leilao vencedor
 channel.queue_declare(queue='leilao_finalizado')
 channel.queue_declare(queue='leilao_vencedor')
 
@@ -123,6 +130,7 @@ def callback_leilao_finalizado(ch, method, properties, body):
         logger.error("ID do leilão não encontrado na mensagem de finalização")
         return
     
+    # Verifica se houve lances válidos
     if id_leilao not in ultimos_lances:
         logger.warning(f"Leilão {id_leilao} finalizado sem lances válidos")
         mensagem = {
@@ -138,10 +146,12 @@ def callback_leilao_finalizado(ch, method, properties, body):
         }
     
     body_vencedor = json.dumps(mensagem).encode('utf-8')
+
+    # Publica na fila leilao_vencedor
     channel.basic_publish(exchange='', routing_key='leilao_vencedor', body=body_vencedor)  
     
-
-channel.basic_consume(queue='leilao_finalizado',auto_ack=True, on_message_callback=callback_leilao_finalizado)
+# Consumir mensagens da fila leilao_finalizado
+channel.basic_consume(queue='leilao_finalizado', on_message_callback=callback_leilao_finalizado, auto_ack=True)
 
 #*****************************************************************************#
 
