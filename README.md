@@ -1,4 +1,4 @@
-# Sistema de Leilões Distribuído
+# Sistema de Leilões Distribuídos
 Sistema de leilões em tempo real usando RabbitMQ e criptografia RSA.
 
 ## Funcionalidades
